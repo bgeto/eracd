@@ -1,0 +1,44 @@
+<?php
+
+function eracd_node_delete($node) {
+
+	$use = FALSE;
+	$nid_deleted = $node->nid;
+
+	$query = db_select('field_config', 'fc');
+	$query->fields('fc', array('field_name'));
+	$query->leftJoin('field_config_instance', 'fci', 'fci.field_id = fc.id');
+	$query->condition('fc.type', 'entityreference');
+	$list_entityreference = $query->execute()->fetchCol();
+
+	//for all the field 
+	foreach ($list_entityreference as $key => $field_name) {
+  	$dbtable = 'field_data_'.$field_name;
+  	$dbtable_revision = 'field_revision_'.$field_name;
+  	$dbtable_field = $field_name.'_target_id';
+
+
+  	$query_dbt = db_select($dbtable, 'dbt');
+		$query_dbt->fields('dbt', array('entity_id'));
+		$query_dbt->condition($dbtable_field, $nid_deleted);
+		$list_dbt = $query_dbt->execute()->fetchCol();
+
+		$query_dbtr = db_select($dbtable_revision, 'dbtr');
+		$query_dbtr->fields('dbtr', array('entity_id'));
+		$query_dbtr->condition($dbtable_field, $nid_deleted);
+		$list_dbtr = $query_dbtr->execute()->fetchCol();
+		
+		if(!empty($list_dbt)) {
+			foreach ($list_dbt as $key => $entity_id) {
+				
+				$num_deleted1 = db_delete($dbtable)->condition($dbtable_field, $nid_deleted, '=')->execute();
+  			$num_deleted2 = db_delete($dbtable_revision)->condition($dbtable_field, $nid_deleted, '=')->execute();
+				
+				if($num_deleted1 == 1) { $use = TRUE; }
+				//$node_entity = node_load($entity_id);
+  			//node_save($node_entity);
+			}
+		}
+	}
+	if($use == TRUE) { drupal_flush_all_caches(); }
+}
